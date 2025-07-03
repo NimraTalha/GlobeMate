@@ -1,3 +1,4 @@
+streamlit
 chainlit
 agentic
 google-generativeai

@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: globemate-ai
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "chainlit run main.py -w --port $PORT"
-    plan: free
-

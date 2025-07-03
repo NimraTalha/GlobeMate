@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🌍 Smart Travel Agent (Multilingual AI Project)
 
 An AI-powered **travel planner agent** built using **Python, Chainlit, Agentic SDK, and Gemini 1.5 Flash** that supports **any language input** (Urdu, Hindi, English, etc.).
@@ -16,3 +17,7 @@ An AI-powered **travel planner agent** built using **Python, Chainlit, Agentic S
 
 ### 💡 Example Prompts
 
+=======
+# GlobeMate
+Your AI TRAVEL AGENT
+>>>>>>> 373cc49a2b724ea484869e404caf89342f7ea675

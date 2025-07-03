@@ -3,3 +3,4 @@ chainlit
 agentic
 google-generativeai
 python-dotenv
+geopy

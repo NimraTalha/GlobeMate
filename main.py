@@ -6,52 +6,59 @@ import streamlit as st
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-# Load environment variables
-load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-# Load Gemini model
-model = genai.GenerativeModel("gemini-1.5-flash")
-
-# Local imports
+# Custom agents
 from agents.route_agent import get_route_distance
 from agents.expense_agent import calculate_trip_expenses
 from agents.hotel import get_hotels
 from agents.food_agent import get_foods
 from agents.attraction_agent import get_attractions
 
+# Load environment variables
+load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-st.set_page_config(page_title="GlobeMate AI", layout="centered")
-st.title("🌍 GlobeMate — Smart Travel Agent")
-st.markdown("Ask your travel question in any language (Urdu, Hindi, English...)")
+# Streamlit App Configuration
+st.set_page_config(page_title="🌍 GlobeMate — Smart Travel Agent", layout="centered")
+st.markdown(
+    "<h1 style='text-align: center; color: #00aaff;'>🌍 GlobeMate</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<h4 style='text-align: center;'>Your AI-powered, Multilingual Travel Planner</h4>",
+    unsafe_allow_html=True,
+)
+st.markdown("💬 **Ask your question in any language (Urdu, Hindi, English, etc.)**")
+st.markdown("✈️ *Example:* `Main Lahore se Hunza bike pe jana chahti hoon. Petrol 295 ka hai.`")
 
-user_input = st.text_input("✈️ Enter your travel plan here:")
+# User Input
+user_input = st.text_input("🗺️ Where are you planning to travel?", placeholder="e.g. Plan a 5-day road trip from Lahore to Skardu by car")
 
-# Step 1: Get structured trip details from Gemini
-@st.cache_data(ttl=3600)
+# Step 1: Gemini to parse trip info
+@st.cache_data(ttl=600)
 def parse_trip(text):
     prompt = f"""
-You are a multilingual AI travel agent. Parse this message into:
-From:
-To:
+You are a multilingual AI travel assistant. Parse this message and return:
+From: 
+To: 
 Mode: (car or bike)
-Average: (km per litre)
-FuelPrice: (Rs. per litre)
+Average: (fuel avg km/l)
+FuelPrice: (price per liter)
 Days: (trip duration)
 
 User message: {text}
 """
-    res = model.generate_content(prompt)
-    return res.text.strip()
+    response = model.generate_content(prompt)
+    return response.text.strip()
+
+# Extract fields
+def extract(pattern, text):
+    match = re.search(pattern, text, re.IGNORECASE)
+    return match.group(1).strip() if match else None
 
 if user_input:
-    with st.spinner("🤖 Understanding your trip..."):
+    with st.spinner("🧠 Understanding your travel plan..."):
         parsed = parse_trip(user_input)
-
-    # Extract structured info using regex
-    def extract(pattern, text):
-        match = re.search(pattern, text, re.IGNORECASE)
-        return match.group(1).strip() if match else None
 
     from_city = extract(r'From:\s*(.+)', parsed)
     to_city = extract(r'To:\s*(.+)', parsed)
@@ -61,70 +68,69 @@ if user_input:
     days = extract(r'Days:\s*(\d+)', parsed)
 
     if not all([from_city, to_city, mode, avg, fuel_price, days]):
-        st.error("⚠️ Couldn't understand all travel details. Please rephrase your message.")
-    else:
-        # Show extracted info for confirmation
-        with st.expander("📋 Confirm Trip Details"):
-            st.markdown(f"""
+        st.error("⚠️ Sorry! Couldn't extract all travel details. Please rephrase your input.")
+        st.stop()
+
+    st.success("✅ Travel details detected:")
+    st.markdown(f"""
 - **From:** {from_city.title()}
 - **To:** {to_city.title()}
-- **Mode:** {mode.title()}
-- **Average:** {avg} km/l
-- **Fuel Price:** Rs. {fuel_price}/l
-- **Days:** {days}
-""")
+- **Mode of Travel:** {mode}
+- **Fuel Average:** {avg} km/l
+- **Fuel Price:** Rs. {fuel_price}
+- **Duration:** {days} days
+    """)
 
-        if st.button("🧭 Plan My Trip"):
-            with st.spinner("🛣️ Planning your route..."):
-                distance = get_route_distance(from_city, to_city)
-                if not distance:
-                    st.error(f"❌ Route not found from {from_city} to {to_city}.")
-                    st.stop()
+    if st.button("🧭 Generate Full Travel Plan"):
+        with st.spinner("📍 Getting route distance..."):
+            distance = get_route_distance(from_city, to_city)
+            if not distance:
+                st.error(f"❌ Couldn't get route info from {from_city} to {to_city}")
+                st.stop()
 
-            with st.spinner("💰 Calculating expenses..."):
-                result = calculate_trip_expenses(
-                    distance_km=distance,
-                    days=int(days),
-                    avg_kmpl=int(avg),
-                    fuel_price=int(fuel_price)
-                )
+        with st.spinner("💰 Calculating estimated expenses..."):
+            cost = calculate_trip_expenses(
+                distance_km=distance,
+                days=int(days),
+                avg_kmpl=int(avg),
+                fuel_price=int(fuel_price)
+            )
 
-            with st.spinner("🏨 Fetching hotels, food & places..."):
-                hotels = get_hotels(to_city)
-                foods = get_foods(to_city)
-                spots = get_attractions(to_city)
+        with st.spinner("🔎 Searching for hotels, foods & attractions..."):
+            hotels = get_hotels(to_city)
+            foods = get_foods(to_city)
+            spots = get_attractions(to_city)
 
-            hotel_list = "\n".join(
-                [f"- 🏨 {h['name']} — Rs. {h['price']} (⭐ {h['rating']})" for h in hotels]
-            ) if hotels else "No hotel data available."
+        hotel_list = "\n".join([f"- 🏨 {h['name']} — Rs. {h['price']} (⭐ {h['rating']})" for h in hotels]) if hotels else "No hotel data found."
+        food_list = "\n".join([f"- 🍽️ {f}" for f in foods]) if foods else "No food data found."
+        spot_list = "\n".join([f"- 📍 {s}" for s in spots]) if spots else "No attraction data found."
 
-            food_list = "\n".join([f"- 🍽️ {f}" for f in foods]) if foods else "No food data."
-            spot_list = "\n".join([f"- 📍 {s}" for s in spots]) if spots else "No tourist spot info."
+        # Final Report
+        st.markdown("---")
+        st.subheader("📋 Your Personalized Travel Plan")
 
-            st.success("✅ Trip Plan Ready!")
-            st.markdown(f"""
-### ✨ **Travel Summary**
-
+        st.markdown(f"""
+### 🚗 Trip Overview
 - **From:** {from_city.title()}
 - **To:** {to_city.title()}
-- **Distance:** {distance} km
-- **Mode:** {mode}
-- **Days:** {days}
+- **Total Distance:** {distance} km
+- **Travel Mode:** {mode}
+- **Trip Duration:** {days} days
 
-### 💰 **Estimated Costs**
-- ⛽ Fuel: Rs. {result['fuel_cost']}
-- 🏨 Hotel: Rs. {result['hotel_cost']}
-- 🍽️ Food: Rs. {result['food_cost']}
-- 💵 **Total: Rs. {result['total_trip_cost']}**
+### 💸 Estimated Costs
+- ⛽ **Fuel:** Rs. {cost['fuel_cost']}
+- 🏨 **Hotel:** Rs. {cost['hotel_cost']}
+- 🍽️ **Food:** Rs. {cost['food_cost']}
+- 💵 **Total:** Rs. {cost['total_trip_cost']}
 
----
-
-### 🏨 Hotels in {to_city.title()}
+### 🏨 Hotel Recommendations
 {hotel_list}
 
-### 🍽️ Popular Foods
+### 🍱 Local Food You Must Try
 {food_list}
 
-### 🗺️ Attractions
+### 🗺️ Tourist Attractions in {to_city.title()}
 {spot_list}
 """)
+
+        st.success("🎉 Trip planned successfully! Bon voyage!")

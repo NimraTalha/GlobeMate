@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+google-generativeai
+geopy
+
+# Optional but kept for local testing or advanced agent SDK usage
+chainlit
+agentic
+
+

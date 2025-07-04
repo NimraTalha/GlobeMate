@@ -1,6 +1,11 @@
-streamlit
+
+
+python-dotenv
+google-generativeai
+geopy
+
+
 chainlit
 agentic
-google-generativeai
-python-dotenv
-geopy
+
+
